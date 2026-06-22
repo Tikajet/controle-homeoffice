@@ -74,6 +74,9 @@ def inicializar_banco():
     conn.close()
     print("💾 Banco de dados inicializado com sucesso!")
 
+# Executa a inicialização do banco para garantir a criação das tabelas na nuvem (Gunicorn)
+inicializar_banco()
+
 # === ROTA DE LOGIN ===
 @app.route('/api/login', methods=['POST'])
 def verificar_login():
@@ -94,17 +97,15 @@ def verificar_login():
     print(f"🚨 [LOGIN FALHOU] Tentativa incorreta para: {usuario}")
     return jsonify({"status": "erro", "mensagem": "Usuário ou senha incorretos."}), 401
 
-# === ROTA: BUSCAR MAILING DO VENDEDOR (CORRIGIDA) ===
+# === ROTA: BUSCAR MAILING DO VENDEDOR ===
 @app.route('/api/mailing/<usuario>', methods=['GET'])
 def obtener_mailing(usuario):
     conn = conectar_banco()
     cursor = conn.cursor()
-    # Busca apenas contatos pendentes atribuídos ao vendedor logado
     cursor.execute("SELECT nome_cliente, telefone FROM mailing WHERE vendedor = ? AND status = 'Pendente'", (usuario,))
     linhas = cursor.fetchall()
     conn.close()
     
-    # Uso correto da variável corrigida 'linhas'
     lista_contatos = [{"nome": r[0], "telefone": r[1]} for r in linhas]
     return jsonify(lista_contatos), 200
 
@@ -137,17 +138,14 @@ def registrar_venda():
     conn = conectar_banco()
     cursor = conn.cursor()
     
-    # 1. Salva o histórico no relatório geral de vendas
     cursor.execute("INSERT INTO relatorio_vendas (vendedor, cliente, resultado, horario) VALUES (?, ?, ?, ?)", (usuario, cliente, resultado, timestamp))
-    
-    # 2. Atualiza o status na tabela do mailing para dar baixa na lista do vendedor
     cursor.execute("UPDATE mailing SET status = ? WHERE nome_cliente = ? AND vendedor = ?", (resultado, cliente, usuario))
     
     conn.commit()
     conn.close()
     
     print(f"💰 [SQLITE VENDA] {timestamp} - {usuario} -> {cliente}: {resultado}")
-    return jsonify({"status": "sucesso", "mensagem": "Venda salva e mailing atualizado!"}), 200
+    return jsonify({"status": "sucesso", "mensagem": "Venda salva e mailing updated!"}), 200
 
 # === ROTA: EXTRAÇÃO DE RELATÓRIOS GERAIS ===
 @app.route('/api/relatorio', methods=['GET'])
@@ -165,5 +163,4 @@ def extrair_relatorio():
     return jsonify({"ponto_e_pausas": pontos, "campanha_vendas": vendas}), 200
 
 if __name__ == '__main__':
-    inicializar_banco()
     app.run(debug=True, port=5000)
