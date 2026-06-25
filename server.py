@@ -55,6 +55,15 @@ def inicializar_banco():
         )
     ''')
     
+    # === NOVA TABELA DE SCRIPTS DINÂMICOS ===
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS scripts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            setor TEXT UNIQUE NOT NULL,
+            conteudo TEXT NOT NULL
+        )
+    ''')
+    
     # Inserir usuários padrão se a tabela estiver vazia
     cursor.execute("SELECT COUNT(*) FROM usuarios")
     if cursor.fetchone()[0] == 0:
@@ -69,6 +78,18 @@ def inicializar_banco():
         cursor.execute("INSERT INTO mailing (vendedor, nome_cliente, telefone) VALUES (?, ?, ?)", ("vendedor1", "Beatriz Souza", "5521933334444"))
         cursor.execute("INSERT INTO mailing (vendedor, nome_cliente, telefone) VALUES (?, ?, ?)", ("vendedor1", "Cláudio Castro", "5531955556666"))
         print("📞 Lista de Mailing padrão carregada para o vendedor1.")
+
+    # === CARGA INICIAL DE SCRIPTS (SE ESTIVER VAZIO) ===
+    cursor.execute("SELECT COUNT(*) FROM scripts")
+    if cursor.fetchone()[0] == 0:
+        scripts_iniciais = [
+            ("Vendas", "=== SCRIPT DE VENDAS ===\n\nOlá, tudo bem? Aqui é da MetroNet.\n\nVi que você tem interesse em nossos planos de fibra óptica. Hoje temos uma oferta especial de 500 Mega por apenas R$ 99,90, com instalação grátis e roteador Wi-Fi 6.\n\nQual o seu CEP para eu verificar a viabilidade técnica na sua rua?"),
+            ("Financeiro - Cobrança", "=== SCRIPT DE COBRANÇA ===\n\nOlá, [Nome do Cliente]. Aqui é do setor financeiro da MetroNet.\n\nConsta em nosso sistema que a sua fatura com vencimento no dia [Data] encontra-se em aberto. Para evitar a suspensão do sinal, enviamos a 2ª via atualizada abaixo.\n\nCaso já tenha efetuado o pagamento, por favor desconsidere."),
+            ("Financeiro - Negociação", "=== SCRIPT DE NEGOCIAÇÃO ===\n\nOlá, [Nome do Cliente]. Entendemos que imprevistos acontecem.\n\nPara ajudar você a regularizar sua conexão, a MetroNet liberou uma condição especial: podemos parcelar o seu débito ou gerar um novo boleto para 5 dias sem juros.\n\nComo fica melhor para você?"),
+            ("Suporte Técnico", "=== SCRIPT DE SUPORTE (TRIAGEM) ===\n\nOlá, [Nome do Cliente]! Aqui é do suporte técnico da MetroNet.\n\nPara restabelecer sua conexão rapidamente, peço que faça um teste simples:\n1. Retire o roteador da tomada.\n2. Aguarde 30 segundos.\n3. Ligue novamente e aguarde as luzes.\n\nMe avise assim que finalizar, por favor!")
+        ]
+        cursor.executemany("INSERT INTO scripts (setor, conteudo) VALUES (?, ?)", scripts_iniciais)
+        print("📜 Tabela de Scripts carregada com os textos padrão.")
     
     conn.commit()
     conn.close()
@@ -161,6 +182,19 @@ def extrair_relatorio():
     
     conn.close()
     return jsonify({"ponto_e_pausas": pontos, "campanha_vendas": vendas}), 200
+
+# === NOVA ROTA: BUSCAR SCRIPTS ===
+@app.route('/api/scripts', methods=['GET'])
+def obter_scripts():
+    conn = conectar_banco()
+    cursor = conn.cursor()
+    cursor.execute("SELECT setor, conteudo FROM scripts")
+    linhas = cursor.fetchall()
+    conn.close()
+    
+    # Transforma o resultado no formato JSON esperado pelo cliente
+    dicionario_scripts = {linha[0]: linha[1] for linha in linhas}
+    return jsonify(dicionario_scripts), 200
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
